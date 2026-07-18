@@ -1,14 +1,15 @@
 # Stride Lab — running form analyzer
 
-Upload a video of yourself running — **front, back, or side view, auto-detected**
-(ideally on a treadmill) — and get:
+Upload a video of yourself running — **front, back, side, or diagonal view,
+auto-detected** (ideally on a treadmill) — and get:
 
 - a **skeleton overlay** on your video with the joints driving each issue flagged in red
-- **five metrics per view**, each scored good / fair / needs-work
+- **a metric set specific to the detected camera angle**, each metric scored good / fair / needs-work
 - **coaching feedback + strengthening exercises** for anything flagged
 
-Angled/oblique clips also work: the app runs the nearer view's metric set and
-warns that angle-based numbers are approximate.
+Each camera angle sees different mechanics, so each gets its own metric set:
+side (sagittal), front (anterior), back (posterior), and two **diagonal views
+that use MediaPipe's 3D world landmarks**, which tolerate camera skew.
 
 Everything runs **in your browser** (MediaPipe Pose via WebAssembly). Your video
 never leaves your device — there is no backend and no upload.
@@ -68,44 +69,58 @@ npm test   # node --test
 ## Metrics & thresholds
 
 All thresholds are **screening heuristics** (see `js/config.js`), adapted from
-running-biomechanics literature for the noise level of single-camera 2D pose:
+running-biomechanics literature for the noise level of single-camera pose.
+The camera view is auto-detected (shoulder-width/torso ratio for front vs side,
+left/right landmark ordering for front vs back, landmark depth tilt for
+diagonal) and selects the metric set. Real-world units (cm) come from scaling
+pixel measurements by the runner's leg length in MediaPipe's world landmarks.
 
-**Any view:**
+**Any view:** cadence (footstrikes per minute, both feet) — good 165–190 spm.
 
-| Metric | How it's measured | Good | Fair | Needs work |
-|---|---|---|---|---|
-| Cadence | footstrikes (ankle-height peaks, both feet) per minute | 165–190 spm | 155–200 | outside |
+**Side view (sagittal)** — propulsion, braking, vertical efficiency:
+ground contact time (ms per stance, from the ankle's contact band), flight time
+(ms with both feet airborne), vertical oscillation (cm of mid-hip bounce),
+overstride distance (cm the foot lands ahead of the hips), overstride shin
+angle at contact, knee flexion at contact (higher is better), heel recovery
+(peak swing knee flexion, higher is better), trunk forward lean.
 
-**Front view** (a back view — detected from the left/right image ordering of
-the shoulders and hips, with face visibility as a tiebreaker — uses the same
-metric set; the app warns that left/right labels can occasionally swap when the
-face is hidden):
+**Back view (posterior coronal)** — lateral stability, symmetry:
+pelvic drop (Trendelenburg angle in stance), rearfoot eversion at mid-stance
+(heel line vs calf line — a coarse pronation proxy), step width (cm between
+consecutive foot strikes), crossover stride (% past the midline), heel whip
+(sideways heel deviation after toe-off), shoulder tilt vs horizontal.
 
-| Metric | How it's measured | Good | Fair | Needs work |
-|---|---|---|---|---|
-| Hip drop | max contralateral pelvic-drop angle during stance | ≤ 6° | ≤ 10° | > 10° |
-| Knee valgus | frontal-plane projection angle (hip–knee–ankle), medial = positive | ≤ 10° | ≤ 18° | > 18° |
-| Crossover gait | foot distance past body midline at contact, % of hip width | ≤ 5% | ≤ 20% | > 20% |
-| Arm crossover | % of frames a wrist swings past the midline (beyond 15% of shoulder width) | ≤ 15% | ≤ 35% | > 35% |
+**Front view (anterior coronal)** — alignment and tracking:
+knee valgus (frontal-plane projection angle), arm crossover distance (% of
+shoulder width the hands travel past the midline), lateral trunk flexion,
+knee window (% of strides keeping daylight between the knees at mid-stance).
 
-**Side view:**
+**Front-diagonal view (anterior oblique, 3D)** — computed from world landmarks
+in the runner's own axes (down/right/forward derived from the body, so camera
+skew doesn't distort angles): 3D knee tracking over toes (inward drift off the
+hip–ankle line), trunk-on-pelvis rotation (transverse plane), elbow flare,
+anterior hip flexion (peak thigh drive in swing).
 
-| Metric | How it's measured | Good | Fair | Needs work |
-|---|---|---|---|---|
-| Overstride | shin angle at footstrike (ankle ahead of knee = positive) | ≤ 8° | ≤ 15° | > 15° |
-| Trunk lean | mid-hip→mid-shoulder line vs vertical, forward = positive | 0–12° | −4–18° | outside |
-| Knee bend at landing | knee flexion at initial contact (**higher is better**) | ≥ 8° | ≥ 4° | < 4° |
-| Vertical bounce | hip vertical range as % of leg length | ≤ 9% | ≤ 12% | > 12% |
+**Back-diagonal view (posterior oblique, 3D)** — posterior-chain mechanics:
+3D hip extension at toe-off (thigh behind the torso axis, higher is better),
+ankle eversion velocity after contact, push-off ankle stability (foot rotation
+/ wobble vs direction of travel), rear-leg drive path (heel should travel up,
+not out).
 
-Sides are reported separately (hip drop is attributed to the **stance** leg —
-the side whose glutes should be preventing the drop).
+Sides are reported separately (pelvic drop is attributed to the **stance** leg —
+the side whose glutes should be preventing the drop). Exact bands for every
+metric live in `js/config.js`; the 3D-view thresholds are the most provisional
+and are marked as experimental in the UI.
 
 ## Limitations (by design)
 
 - **Each view sees only its own plane.** A front view can't see overstriding or
-  trunk lean; a side view can't see hip drop, valgus, or crossover. Oblique
-  camera angles distort angle measurements — the app warns and treats them as
-  approximate rather than refusing.
+  trunk lean; a side view can't see hip drop, valgus, or crossover. Diagonal
+  views switch to 3D world-landmark metrics, which tolerate camera skew but are
+  the noisiest of the sets — the app labels them experimental.
+- Ground contact time, flight time, and eversion velocity are limited by the
+  20 fps sampling (±50 ms per boundary); medians over many steps recover some
+  precision, but treat them as coarse.
 - In a true side view the far leg is often occluded; per-side numbers may be
   incomplete (the app says so when it happens).
 - 2D pose from one camera ≈ screening tool, **not** a clinical gait analysis.

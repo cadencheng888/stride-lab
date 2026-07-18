@@ -58,20 +58,30 @@ export function beginClip() {
   tsBase = lastTs + 1000;
 }
 
-// Detect pose on the current video frame; returns landmarks in PIXEL
-// coordinates ({x, y, z, v}) or null if no person was found. z is depth
-// (hip midpoint = 0, negative = toward the camera), on roughly the same
-// scale as x — used by view detection to spot oblique camera angles.
+// Detect pose on the current video frame. Returns null if no person was
+// found, else { lm, world }:
+//   lm    — 33 landmarks in PIXEL coordinates {x, y, z, v}; z is depth (hip
+//           midpoint = 0, negative = toward the camera) on roughly the x
+//           scale, used by view detection to spot oblique camera angles.
+//   world — the same 33 landmarks in real-world METERS (hip midpoint ≈
+//           origin), used for the 3D metrics in diagonal views and for
+//           converting pixel measurements to centimeters.
 export function detectFrame(landmarker, video, tSeconds) {
   const ts = tsBase + Math.round(tSeconds * 1000);
   lastTs = Math.max(lastTs, ts);
   const result = landmarker.detectForVideo(video, ts);
   const lm = result.landmarks && result.landmarks[0];
   if (!lm) return null;
-  return lm.map((p) => ({
-    x: p.x * video.videoWidth,
-    y: p.y * video.videoHeight,
-    z: (p.z ?? 0) * video.videoWidth,
-    v: p.visibility ?? 1,
-  }));
+  const worldLm = result.worldLandmarks && result.worldLandmarks[0];
+  return {
+    lm: lm.map((p) => ({
+      x: p.x * video.videoWidth,
+      y: p.y * video.videoHeight,
+      z: (p.z ?? 0) * video.videoWidth,
+      v: p.visibility ?? 1,
+    })),
+    world: worldLm
+      ? worldLm.map((p) => ({ x: p.x, y: p.y, z: p.z, v: p.visibility ?? 1 }))
+      : null,
+  };
 }

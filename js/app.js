@@ -170,13 +170,13 @@ async function handleFile(file) {
     const endT = Math.max(0, Math.min(analyzeDur - 0.05, analyzeDur));
     for (let t = 0; t <= endT; t += dt) {
       await seekTo(video, t);
-      let lm = null;
+      let det = null;
       try {
-        lm = detectFrame(landmarker, video, t);
+        det = detectFrame(landmarker, video, t);
       } catch (err) {
         console.warn('detect failed at', t, err);
       }
-      frames.push({ t, lm });
+      frames.push({ t, lm: det ? det.lm : null, world: det ? det.world : null });
       setProgress(t / endT);
     }
     setProgress(1);
@@ -217,13 +217,17 @@ function chip(status) {
 }
 
 function viewLabel(view) {
-  let base;
-  if (view.mode === 'front') {
-    base = view.back ? 'Back view' : 'Front view';
-  } else {
-    base = `Side view (running ${view.facing === 1 ? 'toward the right' : 'toward the left'})`;
+  const names = {
+    front: 'Front view',
+    back: 'Back view',
+    'front-diagonal': 'Front-diagonal view (3D metrics)',
+    'back-diagonal': 'Back-diagonal view (3D metrics)',
+  };
+  if (view.kind === 'side') {
+    const base = `Side view (running ${view.facing === 1 ? 'toward the right' : 'toward the left'})`;
+    return view.angled ? `${base}, camera at an angle` : base;
   }
-  return view.angled ? `${base}, camera at an angle` : base;
+  return names[view.kind] || 'Front view';
 }
 
 function renderResults() {

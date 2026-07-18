@@ -1,0 +1,11 @@
+{
+  "name": "stride-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Front-view running form analyzer — in-browser pose estimation, no backend.",
+  "scripts": {
+    "start": "python3 serve.py",
+    "test": "node --test"
+  }
+}

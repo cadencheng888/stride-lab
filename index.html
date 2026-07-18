@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stride Lab — front-view running form analyzer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Stride Lab</h1>
+      <p class="tagline">Running form analysis from any camera angle — upload a clip, get joint-level flags and drills. Everything runs in your browser; your video never leaves your device.</p>
+    </header>
+
+    <!-- ============ 1. Setup / upload ============ -->
+    <section id="setup">
+      <div id="errorBox" class="error-note" hidden></div>
+
+      <div class="tips">
+        <h2>How to film for good results</h2>
+        <ol>
+          <li><strong>Front, back, or side view — all work.</strong> The app auto-detects the angle and measures what that view can see. Head-on or from behind: hip drop, knee valgus, crossover, arm swing. From the side: overstriding, trunk lean, knee bend at landing, vertical bounce. Cadence works from any angle.</li>
+          <li><strong>Treadmill is ideal</strong> — prop the phone at roughly hip height, 10–15 ft away. Straight-on or perpendicular beats an oblique angle (angled clips still work, but angle-based numbers get approximate).</li>
+          <li><strong>Whole body in frame, 10–20 s of steady running.</strong> Good lighting and fitted clothing help tracking. (Only the first 30 s are analyzed.)</li>
+        </ol>
+        <p class="fine">Want the full picture? Analyze one front-view clip and one side-view clip — each plane reveals different issues.</p>
+      </div>
+
+      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Upload a running video">
+        <div class="dz-icon" aria-hidden="true">🎬</div>
+        <div class="dz-title">Drop your running video here</div>
+        <div class="dz-sub">or click to choose a file (.mp4, .mov, .webm)</div>
+        <input type="file" id="fileInput" accept="video/*" hidden />
+      </div>
+    </section>
+
+    <!-- ============ 2. Processing ============ -->
+    <section id="progress" hidden>
+      <div class="progress-wrap">
+        <div class="spinner" aria-hidden="true"></div>
+        <p id="statusText">Loading pose model…</p>
+        <div class="progress-track" role="progressbar" aria-labelledby="statusText">
+          <div id="progressBar" class="progress-fill"></div>
+        </div>
+        <p id="progressPct" class="fine">0%</p>
+      </div>
+    </section>
+
+    <!-- ============ 3. Results ============ -->
+    <section id="results" hidden>
+      <div id="viewInfo" class="view-info"></div>
+      <div id="warnings"></div>
+
+      <div class="video-wrap">
+        <video id="playVideo" controls playsinline></video>
+        <canvas id="overlay"></canvas>
+      </div>
+
+      <div class="overlay-controls">
+        <label class="toggle"><input type="checkbox" id="showSkeleton" checked /> Show skeleton overlay</label>
+        <div class="overlay-legend">
+          <span><span class="key key-base" aria-hidden="true"></span> tracked joint</span>
+          <span><span class="key key-flag" aria-hidden="true"></span> flagged issue</span>
+          <span><span class="key key-mid" aria-hidden="true"></span> body midline</span>
+        </div>
+      </div>
+
+      <div class="timeline-block">
+        <h2>Footstrikes <span class="fine">(click a tick to jump to it)</span></h2>
+        <div id="timeline" class="timeline"></div>
+        <div class="timeline-legend fine">
+          <span><span class="key key-tickgood" aria-hidden="true"></span> ✓ clean</span>
+          <span><span class="key key-tickflag" aria-hidden="true"></span> ⚠ flagged</span>
+        </div>
+      </div>
+
+      <h2>Metrics</h2>
+      <div id="metricCards" class="cards"></div>
+
+      <h2>Coaching feedback</h2>
+      <div id="feedbackCards"></div>
+
+      <button id="resetBtn" class="btn">Analyze another video</button>
+    </section>
+
+    <footer>
+      <p class="fine">Stride Lab is a screening and coaching aid built on single-camera 2D pose estimation — not a clinical gait analysis or medical advice. If you have pain while running, see a physio or sports-medicine professional.</p>
+    </footer>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

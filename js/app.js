@@ -371,11 +371,13 @@ function drawLoop() {
     const lm = f.lm;
     const pt = (idx) => (lm[idx] && lm[idx].v >= 0.5 ? lm[idx] : null);
 
-    // Body midline (dashed vertical through mid-hips) — front view only;
-    // it has no meaning in a side profile.
+    // Body midline (dashed vertical) — frontal views only; it has no meaning
+    // in a side profile. Uses the same stable clip-median midline the
+    // crossover metric measures against (the instantaneous hip midpoint
+    // sways with each step), falling back to this frame's hips.
     const hl = pt(LM.L_HIP); const hr = pt(LM.R_HIP);
-    if (results.view.mode === 'front' && hl && hr) {
-      const midX = (hl.x + hr.x) / 2;
+    if (results.view.mode === 'front' && (results.midlineX !== null || (hl && hr))) {
+      const midX = results.midlineX !== null ? results.midlineX : (hl.x + hr.x) / 2;
       ctx.save();
       ctx.setLineDash([8, 8]);
       ctx.lineWidth = 2;

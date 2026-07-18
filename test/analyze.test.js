@@ -118,6 +118,27 @@ test('back-diagonal view produces the 3D posterior metric set', () => {
   assert.ok(ext.left !== null || ext.right !== null, 'expected 3D hip extension values');
 });
 
+test('back view: foot crossing the midline during stance is flagged as crossover', () => {
+  // Reproduces the reported miss: the right foot lands at/past the body
+  // midline (x = 300) and the shoe (heel/toe) crosses even further than the
+  // ankle joint. Must not read as "good".
+  const frames = makeClip({ view: 'back' });
+  for (const f of frames) {
+    f.lm[LM.R_ANKLE].x = 292;
+    f.lm[LM.R_HEEL].x = 285;
+    f.lm[LM.R_FOOT].x = 287;
+  }
+  const r = run(frames);
+  assert.equal(r.error, undefined);
+  assert.equal(r.view.kind, 'back');
+  const cross = r.metrics.crossover;
+  // Hip width is 60 px; heel 15 px past midline → 25% of hip width.
+  assert.ok(cross.right > 20, `expected right crossover > 20%, got ${cross.right}`);
+  assert.ok(cross.status === 'bad' || cross.status === 'warn', `status was ${cross.status}`);
+  // The left foot stays on its own side.
+  assert.ok(cross.left !== null && cross.left <= 10, `left was ${cross.left}`);
+});
+
 test('diagonal view without world landmarks degrades gracefully', () => {
   const r = run(makeClip({ view: 'back-diagonal', world: false }));
   assert.equal(r.error, undefined);

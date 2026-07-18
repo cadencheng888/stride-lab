@@ -482,6 +482,25 @@ export function analyze(frames, { fps, width, height }) {
     foot: side === 'L' ? LM.L_FOOT : LM.R_FOOT,
   });
 
+  // Stable body midline + hip width (clip medians). The pelvis sways over the
+  // stance leg each step, so the instantaneous hip midpoint under-reads
+  // midline crossings — measure against the runner's average track line.
+  const midXSamples = [];
+  const hipWSamples = [];
+  for (const f of frames) {
+    const hl = vis(f, LM.L_HIP); const hr = vis(f, LM.R_HIP);
+    if (hl && hr && Math.abs(hl.x - hr.x) > width * 0.02) {
+      midXSamples.push((hl.x + hr.x) / 2);
+      hipWSamples.push(Math.abs(hl.x - hr.x));
+    }
+  }
+  const midlineX = median(midXSamples);
+  const hipWMed = median(hipWSamples);
+  const hipMedX = {
+    L: median(frames.map((f) => { const p = vis(f, LM.L_HIP); return p ? p.x : null; })),
+    R: median(frames.map((f) => { const p = vis(f, LM.R_HIP); return p ? p.x : null; })),
+  };
+
   const evL = events.filter((e) => e.side === 'L');
   const evR = events.filter((e) => e.side === 'R');
   const agg = (evs, key) => median(evs.map((e) => (e[key] === null || e[key] === undefined ? null : e[key])));
@@ -783,23 +802,31 @@ export function analyze(frames, { fps, width, height }) {
         }
       }
 
-      // Crossover: at contact, how far past the midline did the foot land?
+      // Crossover: how far past the body midline does the foot get during
+      // stance? Measured against the stable clip-median midline (the pelvis
+      // sways over the stance leg, so the instantaneous hip midpoint hides
+      // crossings), across the whole stance window, using the most medial of
+      // ankle/heel/toe — a foot caving inward crosses at the shoe before the
+      // ankle joint does.
       let crossPct = null;
-      {
-        const f = frames[ev.frame];
-        const hl = vis(f, LM.L_HIP); const hr = vis(f, LM.R_HIP);
-        const ankle = vis(f, leg.ankle);
-        if (hl && hr && ankle) {
-          const midX = (hl.x + hr.x) / 2;
-          const hipW = Math.abs(hl.x - hr.x);
-          const stanceHipX = stanceHipIdx === LM.L_HIP ? hl.x : hr.x;
-          const sideDir = Math.sign(stanceHipX - midX);
-          if (hipW > width * 0.02 && sideDir !== 0) {
-            const offset = ((ankle.x - midX) * sideDir) / hipW; // + = own side
-            crossPct = Math.max(0, -offset) * 100;
+      if (midlineX !== null && hipWMed !== null && hipMedX[ev.side] !== null) {
+        const sideDir = Math.sign(hipMedX[ev.side] - midlineX);
+        if (sideDir !== 0) {
+          let maxCross = null;
+          for (let i = ev.stance[0]; i <= ev.stance[1]; i += 1) {
+            const f = frames[i];
+            for (const idx of [leg.ankle, leg.heel, leg.foot]) {
+              const p = vis(f, idx);
+              if (!p) continue;
+              const cross = (-(p.x - midlineX) * sideDir) / hipWMed; // + = past midline
+              if (maxCross === null || cross > maxCross) maxCross = cross;
+            }
+          }
+          if (maxCross !== null) {
+            crossPct = Math.max(0, maxCross) * 100;
             if (crossPct > THRESHOLDS.crossover.good) {
               const key = ev.side === 'L' ? 'crossL' : 'crossR';
-              for (let i = from; i <= to; i += 1) frameFlags[i][key] = true;
+              for (let i = ev.stance[0]; i <= ev.stance[1]; i += 1) frameFlags[i][key] = true;
             }
           }
         }
@@ -1079,5 +1106,5 @@ export function analyze(frames, { fps, width, height }) {
     }
   }
 
-  return { duration, detectionRate, view, events, frameFlags, metrics, metricOrder, warnings };
+  return { duration, detectionRate, view, events, frameFlags, metrics, metricOrder, warnings, midlineX };
 }
